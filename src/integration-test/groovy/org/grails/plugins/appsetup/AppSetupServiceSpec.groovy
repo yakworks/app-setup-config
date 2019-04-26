@@ -60,7 +60,7 @@ class AppSetupServiceSpec extends Specification {
         arTranConfig.podRequest.row.enabled
         arTranConfig.podRequest.show.enabled
     }
-    
+
     void "test block level options override default options"() {
         when:
         ConfigObject arTranConfig = config.screens.arTran.menus
