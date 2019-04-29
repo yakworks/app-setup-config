@@ -1,0 +1,57 @@
+
+apply plugin: 'yakworks.grails-plugin'
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 1, 'seconds'
+}
+
+dependencies {
+    profile "org.grails.profiles:web-plugin"
+
+    provided "org.grails:grails-plugin-services"
+    provided "org.grails:grails-plugin-domain-class"
+
+    provided "commons-lang:commons-lang:2.6"
+    compile("org.grails.plugins:view-tools:1.2-SNAPSHOT") { changing = true}
+
+    testRuntime "com.h2database:h2"
+
+    provided "org.grails.plugins:hibernate5"
+    provided "org.hibernate:hibernate-core:$versionHibernate"
+    provided "org.hibernate:hibernate-ehcache:$versionHibernate"
+
+    testCompile "org.grails:grails-gorm-testing-support"
+    testCompile "org.grails:grails-plugin-testing"
+    testCompile "org.grails:grails-web-testing-support"
+}
+
+bootRun {
+    jvmArgs('-Dspring.output.ansi.enabled=always')
+    addResources = true
+    String springProfilesActive = 'spring.profiles.active'
+    systemProperty springProfilesActive, System.getProperty(springProfilesActive)
+}
+// enable if you wish to package this plugin as a standalone application
+bootRepackage.enabled = false
+
+
+ext.codenarcRuleset= '''
+  getRule('NoWildcardImports').enabled = false
+'''
+
+codenarcMain {
+    exclude '**/BootStrap.groovy'
+    exclude '**/UrlMappings.groovy'
+}
+
+codenarcTest {
+    //don't check any of the tests right now as it just slows it down, look at enabling this in future
+    exclude '**/*'
+    ignoreFailures = true
+}
+
+codenarcIntegrationTest {
+    //don't check any of the tests right now as it just slows it down, look at enabling this in future
+    exclude '**/*'
+    ignoreFailures = true
+}
