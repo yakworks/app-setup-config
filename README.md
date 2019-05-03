@@ -14,3 +14,31 @@ Appsetupconfig is loaded and merged by AppSetupService
 
 
 By default, once the Appsetupconfig is parsed, it will be cached, making any changes to any of the files mentioned above will have no effect. however appsetup config can be reloaded by calling grailsApplication.getSetupConfig(true). by passing true, application can be asked to reload appsetup config.
+
+**Configuration**
+The plugin depends on [View-tools](https://github.com/yakworks/view-tools) plugin.
+And needs currentTenantClosure and rootLocation configured.
+
+Example
+
+*application.groovy*
+```groovy
+
+app {
+    resources {
+        currentTenant = { return [id: 1, num: "test-tenant"] }
+        setup.location = "setup" //directory under rootlocation where tenant specific config files can be put
+
+        rootLocation = { args ->
+            File file = new File("PATH TO ROOT LOCATION")
+            if (!file.exists()) {
+                println "Creating rootLocation ${file.canonicalPath}"
+                file.mkdirs()
+            }
+            return file.canonicalPath
+        }
+
+    }
+}
+
+```
