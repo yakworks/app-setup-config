@@ -1,18 +1,31 @@
-# circleCI build file
-version: 2.1
+# Java Gradle CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-java/ for more details
+#
+version: 2
+
 jobs:
   build:
     docker:
       # docker image with python and mkdocs on it already as well, based on gradle:4.6-alpine
-      - image: yakworks/alpine-java:gradle-4.10.3
-    #    branches:
-    #      only:
-    #        - master
+      - image: yakworks/alpine-java:jdk8-builder
+
+      # Specify service dependencies here if necessary
+      # CircleCI maintains a library of pre-built images
+      # documented at https://circleci.com/docs/2.0/circleci-images/
+      # - image: circleci/postgres:9.4
+
+#    branches:
+#      only:
+#        - master
 
     # working_directory: ~/repo
 
     environment:
-      GRADLE_OPTS: "-Xmx1536m -Dorg.gradle.daemon=false" #daemon false doesn't seem to get picked up by fork
+      # Customize the JVM maximum heap limit
+      # JVM_OPTS: -Xmx3200m
+      MALLOC_ARENA_MAX: 2
+      GRADLE_OPTS: "-Xmx3200m -Dorg.gradle.daemon=false" #daemon false doesn't seem to get picked up by fork
       TERM: dumb
 
     parallelism: 1
@@ -20,61 +33,54 @@ jobs:
 
     steps:
       - checkout
-      # Download and cache dependencies
-      - run:
-          name: cat build.gradle files for cache key
-          command: cat gradle.properties build.gradle plugin/build.gradle examples/test-app/build.gradle > cache-checksum.tmp
 
+      # Download and cache dependencies
       - restore_cache:
           keys:
-            - gradle-{{ checksum "cache-checksum.tmp" }}
-      - run:
-          name: ✔︎ Downloads Dependencies [gradle resolveConfigurations]
-          command: gradle resolveConfigurations
+          - v3-gradle-{{ checksum "build.gradle" }}
 
-      # compiling as a seperate step before running check helps with the "finished with non-zero exit value 137" error
-      - run:
-          name: ✔︎ ------ Compile [gradle classes] ------
-          command: gradle classes
+      # see https://github.com/palantir/gradle-configuration-resolver-plugin
+      - run: ./gradlew resolveConfigurations
+      #- run: ./gradlew test-app:dependencies
 
       - save_cache:
-          paths: ["~/.m2", "~/.gradle"]
-          key: v2-gradle-{{ checksum "cache-checksum.tmp" }}
+          paths:
+            - /home/gradle # the https://hub.docker.com/_/gradle/ containter does wierd stuff for cache
+            - ~/.m2
+            - ~/.gradle
+          key: v3-gradle-{{ checksum "build.gradle" }}
 
+
+      #- run: gradle build -s && gradle ciPublish
       - run:
-          name: ✔︎ -- Checks Full Run Tests [gradle check]
-          command: gradle check --max-workers=2
+          name: gradle check tests. skips if only docs were changed
+          command: |
+            commitRange=$(echo "$CIRCLE_COMPARE_URL" | rev | cut -d/ -f1 | rev)
+            if [[ -z "$commitRange" || $(git diff --name-only $commitRange | grep --invert-match -E "(README\.md|mkdocs\.yml|docs/)") ]]; then
+              ./gradlew check
+            fi
 
-      - store_artifacts:
-          path: plugin/build/reports/codenarc
-          destination: codenarc/
+      - run: ./gradlew ciPublish
+
       - store_artifacts:
           path: plugin/build/reports/tests/test/
-          destination: unit/
+          destination: test-reports/unit/
+
       - store_artifacts:
-          path: examples/test-app/build/reports/tests
-          destination: test-app/
+          path: plugin/build/reports/codenarc/
+          destination: codenarc/
+
       - store_test_results:
           path: plugin/build/test-results
+
+      # - run: gradle test-app:check --no-daemon --max-workers 2
+
+      - store_artifacts:
+          path: examples/test-app/build/reports/tests
+          destination: test-reports/integration
+
       - store_test_results:
           path: examples/test-app/build/test-results
 
-      ### Finally do the build and publish. ciPublish will check if this is a PR or on a branch that should not be published
-      - compare-url/reconstruct # orb to make the CIRCLE_COMPARE_URL when using workflows
-      - run:
-          name: ✔︎ -- Publish plugin if needed [gradle ciPublish]
-          command: |
-            CIRCLE_COMPARE_URL=$(cat CIRCLE_COMPARE_URL.txt)
-            gradle ciPublish --no-daemon
 
-orbs:
-  compare-url: iynere/compare-url@1.1.0
-
-workflows:
-  version: 2
-  build-flow:
-    jobs:
-      - build:
-          context: bot-context #context with shared ENV vars
-
-
+      # - run: ./.circleci/publish.sh
